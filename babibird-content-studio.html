@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Babibird Content Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root{
+    --navy:#10262B;
+    --navy-light:#193C43;
+    --sand:#EFE7D8;
+    --sand-dark:#E2D6BE;
+    --mango:#F2A93B;
+    --mango-dark:#D6910F;
+    --teal:#1F6F78;
+    --stamp:#C1443C;
+    --ink:#152024;
+    --white:#FBF8F2;
+    --green:#3F7A56;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--sand);
+    color:var(--ink);
+    font-family:'IBM Plex Sans Thai',sans-serif;
+    min-height:100vh;
+  }
+  .app{max-width:1080px;margin:0 auto;padding:18px 16px 60px;}
+
+  /* ===== Header : boarding pass strip ===== */
+  .header{
+    background:var(--navy);
+    color:var(--white);
+    border-radius:14px;
+    padding:18px 22px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    position:relative;
+    overflow:hidden;
+    border:1px solid var(--ink);
+  }
+  .header::after{
+    content:'';
+    position:absolute;
+    right:-40px;top:-40px;
+    width:140px;height:140px;
+    border-radius:50%;
+    background:radial-gradient(circle,var(--mango) 0%,transparent 70%);
+    opacity:.25;
+  }
+  .brand{display:flex;flex-direction:column;gap:2px;z-index:1;}
+  .brand .tag{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    letter-spacing:.14em;
+    color:var(--mango);
+    text-transform:uppercase;
+  }
+  .brand h1{
+    font-family:'Big Shoulders Display',sans-serif;
+    font-weight:900;
+    font-size:30px;
+    letter-spacing:.02em;
+    margin:0;
+    line-height:1;
+  }
+  .header .route{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    text-align:right;
+    color:var(--sand);
+    z-index:1;
+  }
+
+  /* ===== Tabs styled as gates ===== */
+  .gates{
+    display:flex;
+    gap:8px;
+    margin-top:16px;
+    flex-wrap:wrap;
+  }
+  .gate-btn{
+    flex:1;
+    min-width:130px;
+    background:var(--white);
+    border:1px solid var(--ink);
+    border-radius:10px;
+    padding:10px 12px;
+    cursor:pointer;
+    font-family:'IBM Plex Sans Thai',sans-serif;
+    font-weight:600;
+    font-size:13px;
+    color:var(--ink);
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+    transition:transform .12s ease, background .12s ease;
+  }
+  .gate-btn .gate-label{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;
+    letter-spacing:.1em;
+    color:var(--teal);
+    text-transform:uppercase;
+  }
+  .gate-btn.active{
+    background:var(--navy);
+    color:var(--white);
+  }
+  .gate-btn.active .gate-label{color:var(--mango);}
+  .gate-btn:hover{transform:translateY(-2px);}
+
+  .panel{
+    background:var(--white);
+    border:1px solid var(--ink);
+    border-radius:14px;
+    padding:20px;
+    margin-top:16px;
+  }
+  .panel h2{
+    font-family:'Big Shoulders Display',sans-serif;
+    font-weight:800;
+    font-size:22px;
+    margin:0 0 4px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .panel .sub{
+    font-size:13px;
+    color:#5c6b6d;
+    margin-bottom:16px;
+  }
+
+  button.primary{
+    background:var(--mango);
+    border:1px solid var(--ink);
+    color:var(--ink);
+    font-weight:700;
+    padding:10px 16px;
+    border-radius:8px;
+    cursor:pointer;
+    font-family:'IBM Plex Sans Thai',sans-serif;
+    font-size:14px;
+  }
+  button.primary:hover{background:var(--mango-dark);}
+  button.primary:disabled{opacity:.5;cursor:wait;}
+  button.ghost{
+    background:transparent;
+    border:1px solid var(--ink);
+    color:var(--ink);
+    padding:8px 14px;
+    border-radius:8px;
+    cursor:pointer;
+    font-family:'IBM Plex Sans Thai',sans-serif;
+    font-size:13px;
+  }
+  button.danger{
+    background:transparent;
+    border:1px solid var(--stamp);
+    color:var(--stamp);
+    padding:8px 14px;
+    border-radius:8px;
+    cursor:pointer;
+    font-size:13px;
+  }
+  input[type=text], input[type=date], textarea, select{
+    width:100%;
+    font-family:'IBM Plex Sans Thai',sans-serif;
+    font-size:14px;
+    padding:9px 10px;
+    border:1px solid #b9b2a2;
+    border-radius:8px;
+    background:var(--sand);
+    color:var(--ink);
+  }
+  textarea{resize:vertical;min-height:80px;}
+  label{font-size:12px;font-weight:600;color:var(--navy);display:block;margin-bottom:4px;}
+  .field{margin-bottom:12px;}
+  .row{display:flex;gap:12px;flex-wrap:wrap;}
+  .row > .field{flex:1;min-width:160px;}
+
+  /* ===== Calendar ===== */
+  .cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+  .cal-nav .month-label{
+    font-family:'Big Shoulders Display',sans-serif;
+    font-size:24px;font-weight:800;color:var(--navy);
+  }
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
+  .cal-dow{
+    text-align:center;font-size:11px;font-weight:700;color:var(--teal);
+    font-family:'IBM Plex Mono',monospace;text-transform:uppercase;padding:4px 0;
+  }
+  .cal-day{
+    background:var(--sand);
+    border:1px solid #d8cfba;
+    border-radius:8px;
+    min-height:86px;
+    padding:6px;
+    cursor:pointer;
+    display:flex;flex-direction:column;gap:4px;
+  }
+  .cal-day.empty{background:transparent;border:none;cursor:default;}
+  .cal-day.today{border:2px solid var(--mango);}
+  .cal-day .num{
+    font-family:'Big Shoulders Display',sans-serif;
+    font-weight:800;font-size:16px;color:var(--ink);
+  }
+  .stub{
+    position:relative;
+    background:var(--white);
+    border:1px solid var(--ink);
+    border-radius:5px;
+    padding:3px 6px;
+    font-size:10.5px;
+    font-weight:600;
+    display:flex;align-items:center;gap:4px;
+    overflow:hidden;
+    white-space:nowrap;text-overflow:ellipsis;
+  }
+  .stub .dot{width:7px;height:7px;border-radius:50%;flex:none;}
+  .dot.tiktok{background:var(--ink);}
+  .dot.youtube{background:var(--stamp);}
+  .more-link{font-size:10px;color:var(--teal);font-weight:700;cursor:pointer;}
+
+  .status-pill{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;
+    padding:2px 8px;
+    border-radius:20px;
+    display:inline-block;
+    border:1px solid var(--ink);
+    text-transform:uppercase;
+  }
+  .status-idea{background:#eee;}
+  .status-writing{background:#FDE9C8;}
+  .status-filming{background:#CFE7EA;}
+  .status-editing{background:#E4D6F5;}
+  .status-posted{background:var(--green);color:white;}
+
+  /* ===== Modal ===== */
+  .overlay{
+    position:fixed;inset:0;background:rgba(16,38,43,.55);
+    display:flex;align-items:center;justify-content:center;
+    z-index:50;padding:16px;
+  }
+  .modal{
+    background:var(--white);border-radius:14px;border:1px solid var(--ink);
+    max-width:480px;width:100%;padding:20px;max-height:90vh;overflow:auto;
+  }
+  .modal h3{font-family:'Big Shoulders Display',sans-serif;font-size:20px;margin:0 0 12px;}
+  .modal-actions{display:flex;justify-content:space-between;margin-top:16px;gap:8px;}
+
+  /* ticket stub big card (used in day-list modal & elsewhere) */
+  .ticket{
+    display:flex;background:var(--white);border:1px solid var(--ink);border-radius:10px;overflow:hidden;margin-bottom:10px;
+  }
+  .ticket .tleft{flex:1;padding:10px 12px;}
+  .ticket .tright{
+    width:90px;background:var(--navy);color:var(--white);display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:4px;position:relative;
+    border-left:2px dashed var(--sand);
+  }
+  .ticket .tright::before, .ticket .tright::after{
+    content:'';position:absolute;left:-8px;width:14px;height:14px;background:var(--sand);border-radius:50%;
+  }
+  .ticket .tright::before{top:-7px;}
+  .ticket .tright::after{bottom:-7px;}
+  .ticket .platform{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.05em;}
+
+  /* ===== hook cards ===== */
+  .hook-card{
+    border:1px solid var(--ink);border-radius:10px;padding:12px 14px;margin-bottom:10px;background:var(--sand);
+  }
+  .hook-card .htype{
+    font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--teal);text-transform:uppercase;font-weight:700;
+  }
+  .hook-card p{margin:6px 0 0;font-size:14px;}
+
+  .loading{
+    display:flex;align-items:center;gap:8px;font-size:13px;color:var(--teal);font-weight:600;
+  }
+  .spinner{
+    width:14px;height:14px;border:2px solid var(--sand-dark);border-top-color:var(--teal);
+    border-radius:50%;animation:spin .7s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .toast{
+    position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+    background:var(--navy);color:var(--white);padding:10px 18px;border-radius:30px;
+    font-size:13px;z-index:100;opacity:0;transition:opacity .25s ease;pointer-events:none;
+  }
+  .toast.show{opacity:1;}
+
+  details.bible summary{cursor:pointer;font-weight:700;color:var(--navy);font-size:13px;margin-bottom:8px;}
+
+  .stat-cards{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;}
+  .stat-card{
+    flex:1;min-width:130px;background:var(--navy);color:var(--white);border-radius:10px;padding:12px 14px;
+  }
+  .stat-card .val{font-family:'Big Shoulders Display',sans-serif;font-size:26px;font-weight:800;color:var(--mango);}
+  .stat-card .lbl{font-size:11px;font-family:'IBM Plex Mono',monospace;text-transform:uppercase;}
+
+  table.top{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px;}
+  table.top th, table.top td{border-bottom:1px solid var(--sand-dark);padding:6px 8px;text-align:left;}
+  table.top th{font-family:'IBM Plex Mono',monospace;font-size:11px;text-transform:uppercase;color:var(--teal);}
+
+  .ai-output{
+    background:var(--sand);border:1px solid var(--ink);border-radius:10px;padding:14px;margin-top:14px;
+    font-size:14px;line-height:1.6;white-space:pre-wrap;
+  }
+
+  /* ===== script timeline ===== */
+  .timeline{border-left:3px solid var(--ink);padding-left:0;margin-left:6px;}
+  .seg-row{
+    display:flex;gap:12px;position:relative;padding:0 0 18px 18px;
+  }
+  .seg-row::before{
+    content:'';position:absolute;left:-9px;top:2px;width:14px;height:14px;border-radius:50%;
+    border:2px solid var(--ink);background:var(--white);
+  }
+  .seg-row.seg-start::before{background:var(--mango);}
+  .seg-row.seg-mid::before{background:var(--teal);}
+  .seg-row.seg-end::before{background:var(--stamp);}
+  .seg-time{
+    flex:none;width:78px;font-family:'IBM Plex Mono',monospace;font-size:12px;font-weight:700;color:var(--navy);
+    padding-top:1px;
+  }
+  .seg-body{
+    flex:1;background:var(--white);border:1px solid var(--ink);border-radius:8px;padding:8px 12px;
+  }
+  .seg-part{
+    font-family:'IBM Plex Mono',monospace;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;
+    color:var(--teal);font-weight:700;margin-bottom:3px;
+  }
+  .seg-voice{font-size:14px;line-height:1.5;}
+  .seg-visual{font-size:12px;color:#5c6b6d;margin-top:5px;font-style:italic;}
+  @media(max-width:640px){
+    .gate-btn{min-width:44%;font-size:12px;}
+    .header{flex-direction:column;align-items:flex-start;}
+    .header .route{text-align:left;}
+  }
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============== STORAGE HELPERS ============== */
+async function safeGet(key, fallback){
+  try{
+    const r = await window.storage.get(key);
+    return r ? JSON.parse(r.value) : fallback;
+  }catch(e){ return fallback; }
+}
+async function safeSet(key, value){
+  try{ await window.storage.set(key, JSON.stringify(value)); return true; }
+  catch(e){ console.error('storage set failed', e); return false; }
+}
+
+/* ============== TOAST ============== */
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+/* ============== CLAUDE API HELPER ============== */
+async function callClaude(systemPrompt, userText, opts={}){
+  const body = {
+    model: "claude-sonnet-4-6",
+    max_tokens: opts.maxTokens || 1000,
+    system: systemPrompt,
+    messages: [{ role: "user", content: userText }]
+  };
+  if(opts.webSearch){
+    body.tools = [{ type: "web_search_20250305", name: "web_search" }];
+  }
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  const text = (data.content || []).filter(b=>b.type==="text").map(b=>b.text).join("\n\n");
+  return text || "(ไม่ได้รับคำตอบ ลองใหม่อีกครั้ง)";
+}
+function tryParseJSON(text){
+  let clean = text.trim().replace(/^```json/i,'').replace(/^```/,'').replace(/```$/,'').trim();
+  try{ return JSON.parse(clean); }catch(e){ return null; }
+}
+
+/* ============== DEFAULTS ============== */
+const DEFAULT_STYLE_BIBLE = `สไตล์การเขียนของช่อง Babibird:
+- ใช้ภาษาไทยแบบพูดคุยเป็นกันเอง ผสมคำทับศัพท์ภาษาอังกฤษที่คนไทยใช้จริง (hook, content, vibe, worth it)
+- ประโยคสั้น กระชับ อ่านลื่น ไม่ยืดเยื้อ
+- ใช้สรรพนามบุรุษที่ 1 "ผม" ตลอดสคริปต์
+- โทนเหมือนเล่าเรื่องให้เพื่อนฟัง เป็นกันเอง จริงใจ ไม่ยัดเยียดขาย
+- คอนเทนต์แนว "รีวิวตรงไปตรงมา" ช่วยคนลังเลตัดสินใจก่อนไปเที่ยว
+- ชอบใช้มุม Contrarian Hook ตั้งคำถามท้าทายความเชื่อทั่วไป`;
+
+const DEFAULT_HOOK_FRAMEWORKS = `Hook Frameworks ที่ใช้ประจำ:
+1. Contrarian Hook — ท้าทายความเชื่อทั่วไป เช่น "ทุกคนบอกว่าอย่าไปหน้าฝน แต่..."
+2. Curiosity Gap — เปิดด้วยผลลัพธ์ที่ทำให้อยากรู้ที่มา เช่น "ผมเกือบไม่ได้กินอันนี้ แต่มันเปลี่ยนทริปทั้งหมด"
+3. Pain Point / Relatable — พูดถึงปัญหาที่คนดูกำลังเจอ เช่น "ถ้ากำลังลังเลว่าจะไปหน้านี้ดีไหม..."
+
+CTA Frameworks ตามเป้าหมาย:
+- ต้องการ Follow: ชวนติดตามเพื่อดูทริปต่อไป/ซีรีส์ต่อ
+- ต้องการ Comment: ตั้งคำถามปลายเปิดให้คนดูมาเถียง/แชร์ประสบการณ์
+- ต้องการ Save: บอกว่าคลิปนี้จะมีประโยชน์ตอนวางแผนจริง ให้เซฟไว้
+- ต้องการดูจนจบ: ทีเซอร์ไว้ตอนต้นว่าจะมีอะไรเซอร์ไพรส์ตอนท้าย
+
+Pacing 60 วิสำหรับ TikTok:
+0-3s Hook, 3-15s Setup, 15-45s Payoff, 45-60s CTA/loop back`;
+
+const DEFAULT_PRODUCTION_NOTES = `เทคนิคการถ่ายทำ / Visual Hook:
+- 3 วินาทีแรกคือช่วงตัดสินใจของคนดู ต้องมีทั้ง hook คำพูด (ประโยคชวนสงสัย) และ visual hook (สีสะดุดตา/มุมกล้องแปลกๆ) เพื่อหยุดนิ้วคนดู
+- ระหว่างคลิปให้สลับมุมกล้อง/แตกช็อตบ่อยๆ เพื่อสร้างความคาดหวังให้คนดูรอลุ้นช็อตถัดไป ลดความน่าเบื่อ ช่วยให้ดูจนจบ
+
+อุปกรณ์หลัก:
+- กล้องจิ๋วแบบ Insta360 Go Ultra: จอแยกมอนิเตอร์ เลนส์ถอดแยกได้ มุมกว้าง 156 องศา ถ่าย 4K 60fps โหมดแสงน้อย กันน้ำลึกถึง 10 เมตร เหมาะงานภาคสนาม/กิจกรรมทางน้ำ
+
+เวิร์กโฟลว์ถ่ายครั้งเดียวลงได้ทุกแพลตฟอร์ม:
+- ถ่ายแนวนอนแต่เปิดไกด์ไลน์แนวตั้ง 9:16 บนจอมอนิเตอร์ (เช่นแอป Black Magic Camera) เพื่อจัดองค์ประกอบให้ของสำคัญอยู่ในกรอบ ครอปเป็นแนวตั้งทีหลังได้โดยไม่หลุดเฟรม
+- ต้องถ่ายที่ความละเอียด 4K เป็นอย่างต่ำ เพื่อไม่ให้ภาพแตกตอนขยาย/ครอป`;
+
+/* ============== STATE ============== */
+let state = {
+  tab: 'calendar',
+  items: [],
+  styleBible: DEFAULT_STYLE_BIBLE,
+  hookFrameworks: DEFAULT_HOOK_FRAMEWORKS,
+  productionNotes: DEFAULT_PRODUCTION_NOTES,
+  calMonth: new Date().getMonth(),
+  calYear: new Date().getFullYear(),
+  modal: null, // {type:'day', date} | {type:'edit', item}
+  analytics: null, // parsed summary
+  scriptResult: null,
+  scriptLoading: false,
+  trendResult: null,
+  trendLoading: false,
+  critiqueResult: null,
+  critiqueLoading: false
+};
+
+async function loadState(){
+  state.items = await safeGet('content-items', []);
+  state.styleBible = await safeGet('style-bible', DEFAULT_STYLE_BIBLE);
+  state.hookFrameworks = await safeGet('hook-frameworks', DEFAULT_HOOK_FRAMEWORKS);
+  state.productionNotes = await safeGet('production-notes', DEFAULT_PRODUCTION_NOTES);
+  render();
+}
+
+function uid(){ return 'id' + Math.random().toString(36).slice(2,10); }
+
+/* ============== RENDER ROOT ============== */
+function render(){
+  const app = document.getElementById('app');
+  app.innerHTML = `
+    <div class="header">
+      <div class="brand">
+        <span class="tag">Boarding Pass · Content Ops</span>
+        <h1>BABIBIRD STUDIO</h1>
+      </div>
+      <div class="route">CHIANG MAI → EVERYWHERE<br>TIKTOK · YOUTUBE</div>
+    </div>
+    <div class="gates">
+      ${gateBtn('calendar','GATE 1','ปฏิทินคอนเทนต์')}
+      ${gateBtn('script','GATE 2','Hook & Script')}
+      ${gateBtn('trend','GATE 3','วิเคราะห์เทรนด์')}
+      ${gateBtn('critique','GATE 4','วิจารณ์คลิป')}
+    </div>
+    <div id="panel">${renderPanel()}</div>
+    ${state.modal ? renderModal() : ''}
+  `;
+  attachHandlers();
+}
+function gateBtn(id,label,title){
+  return `<button class="gate-btn ${state.tab===id?'active':''}" data-tab="${id}">
+    <span class="gate-label">${label}</span>${title}
+  </button>`;
+}
+
+/* ============== PANEL ROUTER ============== */
+function renderPanel(){
+  if(state.tab==='calendar') return renderCalendar();
+  if(state.tab==='script') return renderScriptTab();
+  if(state.tab==='trend') return renderTrendTab();
+  if(state.tab==='critique') return renderCritiqueTab();
+  return '';
+}
+
+/* ============== CALENDAR ============== */
+const DOW = ['อา','จ','อ','พ','พฤ','ศ','ส'];
+const MONTHS = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+
+function renderCalendar(){
+  const y = state.calYear, m = state.calMonth;
+  const firstDow = new Date(y,m,1).getDay();
+  const daysInMonth = new Date(y,m+1,0).getDate();
+  const todayStr = new Date().toISOString().slice(0,10);
+
+  let cells = '';
+  for(let i=0;i<firstDow;i++) cells += `<div class="cal-day empty"></div>`;
+  for(let d=1; d<=daysInMonth; d++){
+    const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const dayItems = state.items.filter(it=>it.date===dateStr);
+    const shown = dayItems.slice(0,2);
+    const extra = dayItems.length - shown.length;
+    cells += `<div class="cal-day ${dateStr===todayStr?'today':''}" data-date="${dateStr}">
+      <div class="num">${d}</div>
+      ${shown.map(it=>`<div class="stub" data-item="${it.id}"><span class="dot ${it.platform}"></span>${escapeHtml(it.title)}</div>`).join('')}
+      ${extra>0 ? `<div class="more-link" data-date="${dateStr}">+${extra} เพิ่มเติม</div>` : ''}
+    </div>`;
+  }
+
+  return `
+    <div class="panel">
+      <h2>📋 ปฏิทินคอนเทนต์</h2>
+      <div class="sub">วางแผนว่าวันไหนทำอะไร คลิกวันที่เพื่อเพิ่มคอนเทนต์ใหม่</div>
+      <div class="cal-nav">
+        <button class="ghost" id="prevMonth">← เดือนก่อน</button>
+        <div class="month-label">${MONTHS[m]} ${y+543}</div>
+        <button class="ghost" id="nextMonth">เดือนถัดไป →</button>
+      </div>
+      <div class="cal-grid">
+        ${DOW.map(d=>`<div class="cal-dow">${d}</div>`).join('')}
+        ${cells}
+      </div>
+    </div>
+  `;
+}
+
+function escapeHtml(s){ const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
+
+/* ============== MODAL (add/edit content item + day list) ============== */
+function renderModal(){
+  const mo = state.modal;
+  if(mo.type==='daylist'){
+    const dayItems = state.items.filter(it=>it.date===mo.date);
+    return `<div class="overlay" id="overlay">
+      <div class="modal">
+        <h3>${mo.date}</h3>
+        ${dayItems.map(it=>`
+          <div class="ticket">
+            <div class="tleft">
+              <div style="font-weight:700">${escapeHtml(it.title)}</div>
+              <span class="status-pill status-${it.status}">${statusLabel(it.status)}</span>
+            </div>
+            <div class="tright">
+              <div class="platform">${it.platform.toUpperCase()}</div>
+              <button class="ghost" style="font-size:11px;padding:4px 8px" data-edit="${it.id}">แก้ไข</button>
+            </div>
+          </div>
+        `).join('') || '<p style="font-size:13px;color:#777">ยังไม่มีคอนเทนต์วันนี้</p>'}
+        <div class="modal-actions">
+          <button class="primary" id="addNewForDay">+ เพิ่มคอนเทนต์วันนี้</button>
+          <button class="ghost" id="closeModal">ปิด</button>
+        </div>
+      </div>
+    </div>`;
+  }
+  // edit / create form
+  const item = mo.item || { id:null, date:mo.date || new Date().toISOString().slice(0,10), platform:'tiktok', title:'', status:'idea', hook:'', cta:'', notes:'' };
+  return `<div class="overlay" id="overlay">
+    <div class="modal">
+      <h3>${item.id ? 'แก้ไขคอนเทนต์' : 'เพิ่มคอนเทนต์ใหม่'}</h3>
+      <div class="row">
+        <div class="field"><label>วันที่</label><input type="date" id="f-date" value="${item.date}"></div>
+        <div class="field"><label>แพลตฟอร์ม</label>
+          <select id="f-platform">
+            <option value="tiktok" ${item.platform==='tiktok'?'selected':''}>TikTok</option>
+            <option value="youtube" ${item.platform==='youtube'?'selected':''}>YouTube</option>
+          </select>
+        </div>
+      </div>
+      <div class="field"><label>หัวข้อ/ชื่อคลิป</label><input type="text" id="f-title" value="${escapeHtml(item.title)}" placeholder="เช่น Bali หน้าฝน คุ้มมั้ย?"></div>
+      <div class="field"><label>สถานะ</label>
+        <select id="f-status">
+          ${['idea','writing','filming','editing','posted'].map(s=>`<option value="${s}" ${item.status===s?'selected':''}>${statusLabel(s)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field"><label>Hook (ถ้ามี)</label><input type="text" id="f-hook" value="${escapeHtml(item.hook||'')}"></div>
+      <div class="field"><label>CTA (ถ้ามี)</label><input type="text" id="f-cta" value="${escapeHtml(item.cta||'')}"></div>
+      <div class="field"><label>โน้ต</label><textarea id="f-notes">${escapeHtml(item.notes||'')}</textarea></div>
+      <div class="modal-actions">
+        <div style="display:flex;gap:8px">
+          <button class="primary" id="saveItem">บันทึก</button>
+          ${item.id ? `<button class="danger" id="deleteItem">ลบ</button>` : ''}
+        </div>
+        <button class="ghost" id="closeModal">ยกเลิก</button>
+      </div>
+    </div>
+  </div>`;
+}
+function statusLabel(s){
+  return {idea:'ไอเดีย',writing:'เขียนสคริปต์',filming:'ถ่ายทำ',editing:'ตัดต่อ',posted:'โพสต์แล้ว'}[s] || s;
+}
+
+/* ============== SCRIPT & HOOK GENERATOR TAB ============== */
+function renderScriptTab(){
+  return `<div class="panel">
+    <h2>🎬 Hook & Script Generator</h2>
+    <div class="sub">ใส่หัวข้อ แล้วให้ AI ช่วยคิด hook หลายแบบ + สคริปต์ + CTA ตามสไตล์ของช่อง</div>
+
+    <details class="bible">
+      <summary>ดู/แก้ไข Style Bible & Hook Frameworks</summary>
+      <div class="field"><label>Style Bible</label><textarea id="styleBibleInput" rows="6">${escapeHtml(state.styleBible)}</textarea></div>
+      <div class="field"><label>Hook / CTA Frameworks</label><textarea id="hookFrameworksInput" rows="8">${escapeHtml(state.hookFrameworks)}</textarea></div>
+      <div class="field"><label>เทคนิคการถ่ายทำ / Visual Hook / อุปกรณ์</label><textarea id="productionNotesInput" rows="10">${escapeHtml(state.productionNotes)}</textarea></div>
+      <button class="ghost" id="saveBible">บันทึก Style Bible</button>
+    </details>
+
+    <div class="row" style="margin-top:14px">
+      <div class="field"><label>หัวข้อ / สถานที่ / มุมมอง</label><input type="text" id="scriptTopic" placeholder="เช่น เที่ยว Nusa Penida หน้าฝน คุ้มมั้ย"></div>
+      <div class="field"><label>แพลตฟอร์ม</label>
+        <select id="scriptPlatform">
+          <option value="tiktok">TikTok (60 วิ)</option>
+          <option value="youtube">YouTube (ยาว)</option>
+        </select>
+      </div>
+    </div>
+    <div class="field"><label>เป้าหมาย CTA</label>
+      <select id="scriptGoal">
+        <option value="follow">อยากให้ Follow</option>
+        <option value="comment">อยากให้ Comment</option>
+        <option value="save">อยากให้ Save</option>
+        <option value="watch">อยากให้ดูจนจบ</option>
+      </select>
+    </div>
+    <button class="primary" id="generateScript" ${state.scriptLoading?'disabled':''}>
+      ${state.scriptLoading ? 'กำลังคิด...' : '✨ สร้าง Hook + Script'}
+    </button>
+    ${state.scriptLoading ? `<div class="loading" style="margin-top:10px"><span class="spinner"></span>AI กำลังร่าง hook และสคริปต์...</div>` : ''}
+    ${state.scriptResult ? renderScriptResult() : ''}
+  </div>`;
+}
+
+function renderScriptResult(){
+  const r = state.scriptResult;
+  if(r.raw){
+    return `<div class="ai-output">${escapeHtml(r.raw)}</div>`;
+  }
+  return `
+    <div style="margin-top:18px">
+      <h3 style="font-family:'Big Shoulders Display';font-size:18px;margin-bottom:8px">ตัวเลือก Hook</h3>
+      ${(r.hooks||[]).map(h=>`
+        <div class="hook-card">
+          <div class="htype">${escapeHtml(h.type||'')}</div>
+          <p>${escapeHtml(h.text||'')}</p>
+        </div>
+      `).join('')}
+      <h3 style="font-family:'Big Shoulders Display';font-size:18px;margin:14px 0 8px">ไทม์ไลน์สคริปต์ (ช่วงต้น → กลาง → ท้าย)</h3>
+      <div class="timeline">
+        ${(r.segments||[]).map(seg=>`
+          <div class="seg-row seg-${segClass(seg.part)}">
+            <div class="seg-time">${escapeHtml(seg.time||'')}</div>
+            <div class="seg-body">
+              <div class="seg-part">${escapeHtml(seg.part||'')}</div>
+              <div class="seg-voice">${escapeHtml(seg.voiceover||'')}</div>
+              ${seg.visual ? `<div class="seg-visual">🎥 ${escapeHtml(seg.visual)}</div>` : ''}
+            </div>
+          </div>
+        `).join('') || '<p style="font-size:13px;color:#777">ไม่มีข้อมูลไทม์ไลน์</p>'}
+      </div>
+      <h3 style="font-family:'Big Shoulders Display';font-size:18px;margin:14px 0 8px">CTA แนะนำ</h3>
+      <div class="ai-output">${escapeHtml(r.cta||'')}</div>
+      <button class="ghost" id="saveScriptToCal" style="margin-top:10px">📌 บันทึกลงปฏิทิน</button>
+    </div>
+  `;
+}
+function segClass(part){
+  const p = (part||'').toLowerCase();
+  if(p.includes('hook') || p.includes('ต้น')) return 'start';
+  if(p.includes('ท้าย') || p.includes('cta')) return 'end';
+  return 'mid';
+}
+function segmentsToText(segments){
+  return (segments||[]).map(s=>`[${s.time}] ${s.part}\nพูด: ${s.voiceover}${s.visual ? '\nภาพ: '+s.visual : ''}`).join('\n\n');
+}
+
+async function generateScript(){
+  const topic = document.getElementById('scriptTopic').value.trim();
+  if(!topic){ toast('ใส่หัวข้อก่อนนะครับ'); return; }
+  const platform = document.getElementById('scriptPlatform').value;
+  const goal = document.getElementById('scriptGoal').value;
+  const goalLabel = {follow:'ให้ Follow',comment:'ให้ Comment',save:'ให้ Save',watch:'ให้ดูจนจบ'}[goal];
+
+  state.scriptLoading = true; state.scriptResult = null; render();
+
+  const system = `คุณเป็นผู้ช่วยเขียนสคริปต์คอนเทนต์ท่องเที่ยวให้ครีเอเตอร์ชื่อ Babibird
+${state.styleBible}
+
+${state.hookFrameworks}
+
+${state.productionNotes}
+
+กำหนดความยาวรวมของคลิป: ${platform === 'tiktok' ? '60 วินาที' : '6-8 นาที'}
+
+ให้แบ่งสคริปต์ออกเป็นช่วงเวลาที่ชัดเจน (segments) ครอบคลุมตั้งแต่ต้นจนจบคลิปโดยไม่มีช่วงเวลาขาดหาย แต่ละช่วงต้องระบุ:
+- time: ช่วงเวลาแบบ "0:00-0:03" (นาที:วินาที)
+- part: ระบุว่าเป็น "ช่วงต้น (Hook)", "ช่วงต้น (Setup)", "ช่วงกลาง (Payoff)", หรือ "ช่วงท้าย (CTA)"
+- voiceover: บทพูดของผมในช่วงนั้น (ภาษาพูด กระชับ)
+- visual: คำแนะนำภาพ/มุมกล้อง/การแตกช็อตในช่วงนั้น
+
+สำหรับ TikTok ให้มีอย่างน้อย 4 ช่วง ตาม pacing 0-3s / 3-15s / 15-45s / 45-60s
+สำหรับ YouTube ให้แบ่งเป็นช่วงย่อยทุกประมาณ 30-60 วินาที จนครบความยาว
+
+ตอบกลับเป็น JSON เท่านั้น ห้ามมีข้อความอื่นหรือ markdown code fence นอกเหนือจาก JSON โครงสร้างนี้:
+{"hooks":[{"type":"ชื่อ framework","text":"ตัวอย่างประโยค hook"}, ... อย่างน้อย 3 แบบ],"segments":[{"time":"0:00-0:03","part":"ช่วงต้น (Hook)","voiceover":"...","visual":"..."}, ...ครบทุกช่วงจนจบคลิป],"cta":"คำแนะนำ CTA พร้อมตัวอย่างประโยค"}`;
+
+  const userMsg = `หัวข้อ: ${topic}
+แพลตฟอร์ม: ${platform === 'tiktok' ? 'TikTok ความยาว 60 วินาที' : 'YouTube แบบยาว'}
+เป้าหมาย CTA: ${goalLabel}`;
+
+  try{
+    const text = await callClaude(system, userMsg, { maxTokens: 3000 });
+    const parsed = tryParseJSON(text);
+    state.scriptResult = parsed || { raw: text };
+  }catch(e){
+    state.scriptResult = { raw: 'เกิดข้อผิดพลาด ลองใหม่อีกครั้งครับ: ' + e.message };
+  }
+  state.scriptLoading = false;
+  render();
+}
+
+/* ============== TREND ANALYSIS TAB ============== */
+function renderTrendTab(){
+  return `<div class="panel">
+    <h2>📈 วิเคราะห์เทรนด์</h2>
+    <div class="sub">อัปโหลดไฟล์ export จาก TikTok/YouTube analytics (.csv) เพื่อดูภาพรวม แล้วให้ AI ช่วยวิเคราะห์เทรนด์ปัจจุบัน+อนาคต</div>
+
+    <div class="field">
+      <label>อัปโหลดไฟล์ CSV</label>
+      <input type="file" id="csvFile" accept=".csv">
+    </div>
+
+    ${state.analytics ? renderAnalyticsSummary() : ''}
+
+    <button class="primary" id="runTrendAI" ${state.trendLoading?'disabled':''} style="margin-top:10px">
+      ${state.trendLoading ? 'กำลังวิเคราะห์...' : '🔎 วิเคราะห์เทรนด์ด้วย AI (ค้นเว็บด้วย)'}
+    </button>
+    ${state.trendLoading ? `<div class="loading" style="margin-top:10px"><span class="spinner"></span>กำลังค้นข้อมูลเทรนด์และวิเคราะห์...</div>` : ''}
+    ${state.trendResult ? `<div class="ai-output">${escapeHtml(state.trendResult)}</div>` : ''}
+  </div>`;
+}
+
+function renderAnalyticsSummary(){
+  const a = state.analytics;
+  return `
+    <div class="stat-cards">
+      <div class="stat-card"><div class="val">${a.rowCount}</div><div class="lbl">คลิปทั้งหมด</div></div>
+      <div class="stat-card"><div class="val">${formatNum(a.totalViews)}</div><div class="lbl">ยอดวิวรวม</div></div>
+      <div class="stat-card"><div class="val">${formatNum(a.avgViews)}</div><div class="lbl">วิวเฉลี่ย/คลิป</div></div>
+      <div class="stat-card"><div class="val">${a.engagementRate!=null ? a.engagementRate+'%' : '-'}</div><div class="lbl">Engagement Rate</div></div>
+    </div>
+    ${a.hasDateSeries ? `<canvas id="trendChart" height="90"></canvas>` : ''}
+    ${a.topRows && a.topRows.length ? `
+      <table class="top">
+        <thead><tr><th>คลิป</th><th>วิว</th></tr></thead>
+        <tbody>${a.topRows.map(r=>`<tr><td>${escapeHtml(r.title)}</td><td>${formatNum(r.views)}</td></tr>`).join('')}</tbody>
+      </table>` : ''}
+  `;
+}
+function formatNum(n){ if(n==null||isNaN(n)) return '-'; return Number(n).toLocaleString('en-US'); }
+
+function findCol(headers, keywords){
+  const lower = headers.map(h=>h.toLowerCase());
+  for(const kw of keywords){
+    const idx = lower.findIndex(h=>h.includes(kw));
+    if(idx>-1) return headers[idx];
+  }
+  return null;
+}
+
+function handleCsvUpload(file){
+  Papa.parse(file, {
+    header:true,
+    skipEmptyLines:true,
+    complete: (results)=>{
+      const rows = results.data;
+      if(!rows.length){ toast('อ่านไฟล์ไม่สำเร็จ หรือไฟล์ว่าง'); return; }
+      const headers = results.meta.fields;
+      const viewCol = findCol(headers, ['view']);
+      const likeCol = findCol(headers, ['like']);
+      const commentCol = findCol(headers, ['comment']);
+      const shareCol = findCol(headers, ['share']);
+      const titleCol = findCol(headers, ['title','video','name','post']);
+      const dateCol = findCol(headers, ['date','time','published']);
+
+      const num = v => { const n = parseFloat(String(v).replace(/,/g,'')); return isNaN(n)?0:n; };
+      let totalViews=0, totalLikes=0, totalComments=0, totalShares=0;
+      const parsedRows = rows.map(r=>({
+        title: titleCol ? r[titleCol] : '(ไม่ทราบชื่อ)',
+        views: viewCol ? num(r[viewCol]) : 0,
+        likes: likeCol ? num(r[likeCol]) : 0,
+        comments: commentCol ? num(r[commentCol]) : 0,
+        shares: shareCol ? num(r[shareCol]) : 0,
+        date: dateCol ? r[dateCol] : null
+      }));
+      parsedRows.forEach(r=>{ totalViews+=r.views; totalLikes+=r.likes; totalComments+=r.comments; totalShares+=r.shares; });
+
+      const avgViews = rows.length ? Math.round(totalViews/rows.length) : 0;
+      const engagementRate = totalViews ? +(( (totalLikes+totalComments+totalShares) / totalViews)*100).toFixed(2) : null;
+      const topRows = [...parsedRows].sort((a,b)=>b.views-a.views).slice(0,5);
+      const hasDateSeries = !!dateCol;
+
+      state.analytics = {
+        rowCount: rows.length, totalViews, avgViews, engagementRate, topRows, hasDateSeries,
+        seriesData: hasDateSeries ? parsedRows.filter(r=>r.date).sort((a,b)=>new Date(a.date)-new Date(b.date)) : null
+      };
+      render();
+      if(hasDateSeries){ setTimeout(drawTrendChart, 50); }
+      toast('อ่านไฟล์สำเร็จ');
+    },
+    error: ()=> toast('อ่านไฟล์ไม่สำเร็จ')
+  });
+}
+
+let chartInstance = null;
+function drawTrendChart(){
+  const canvas = document.getElementById('trendChart');
+  if(!canvas || !state.analytics.seriesData) return;
+  if(chartInstance) chartInstance.destroy();
+  const data = state.analytics.seriesData;
+  chartInstance = new Chart(canvas, {
+    type:'line',
+    data:{
+      labels: data.map(d=>d.date),
+      datasets:[{ label:'วิว', data: data.map(d=>d.views), borderColor:'#1F6F78', backgroundColor:'rgba(31,111,120,0.15)', fill:true, tension:.3 }]
+    },
+    options:{ plugins:{legend:{display:false}}, scales:{ x:{ticks:{maxTicksLimit:8}} } }
+  });
+}
+
+async function runTrendAI(){
+  state.trendLoading = true; state.trendResult = null; render();
+  const a = state.analytics;
+  const summary = a ? `สรุปข้อมูลช่อง: จำนวนคลิป ${a.rowCount}, ยอดวิวรวม ${a.totalViews}, วิวเฉลี่ย ${a.avgViews}, engagement rate ${a.engagementRate}%. คลิปที่วิวสูงสุด: ${a.topRows.map(r=>r.title+' ('+r.views+' วิว)').join(', ')}.`
+    : 'ยังไม่มีข้อมูลสถิติช่องอัปโหลด ให้วิเคราะห์จากเทรนด์ตลาดโดยรวมของคอนเทนต์ท่องเที่ยวแนวรีวิวตรงไปตรงมาบน TikTok/YouTube';
+
+  const system = `คุณเป็นนักวิเคราะห์เทรนด์คอนเทนต์ท่องเที่ยวสำหรับครีเอเตอร์ไทยชื่อ Babibird (คอนเทนต์แนวรีวิวตรงไปตรงมา ลง TikTok และ YouTube)
+${state.styleBible}
+ให้วิเคราะห์เป็นภาษาไทย กระชับ แบ่งเป็นหัวข้อ: 1) ภาพรวมผลงานช่องตอนนี้ 2) เทรนด์คอนเทนต์ท่องเที่ยวที่กำลังมาแรงตอนนี้ 3) แนวโน้มที่น่าจะมาในอนาคตอันใกล้ 4) คำแนะนำหัวข้อคลิปที่ควรทำต่อไป 3 อย่าง`;
+
+  try{
+    const text = await callClaude(system, summary, { webSearch:true, maxTokens: 1500 });
+    state.trendResult = text;
+  }catch(e){
+    state.trendResult = 'เกิดข้อผิดพลาด: ' + e.message;
+  }
+  state.trendLoading = false;
+  render();
+}
+
+/* ============== CLIP CRITIQUE TAB ============== */
+function renderCritiqueTab(){
+  return `<div class="panel">
+    <h2>🧐 วิจารณ์คลิป</h2>
+    <div class="sub">วางสคริปต์ หรือคำบรรยายคลิปที่ทำเสร็จแล้ว ให้ AI วิจารณ์ตาม hook/CTA framework ของช่อง</div>
+    <div class="field"><label>สคริปต์ / เนื้อหาคลิป</label>
+      <textarea id="critiqueInput" rows="10" placeholder="วางสคริปต์เต็ม หรือสรุปเนื้อหาคลิปที่นี่..."></textarea>
+    </div>
+    <button class="primary" id="runCritique" ${state.critiqueLoading?'disabled':''}>
+      ${state.critiqueLoading ? 'กำลังวิจารณ์...' : '🧠 วิจารณ์คลิปนี้'}
+    </button>
+    ${state.critiqueLoading ? `<div class="loading" style="margin-top:10px"><span class="spinner"></span>กำลังวิเคราะห์คลิป...</div>` : ''}
+    ${state.critiqueResult ? `<div class="ai-output">${escapeHtml(state.critiqueResult)}</div>` : ''}
+  </div>`;
+}
+
+async function runCritique(){
+  const input = document.getElementById('critiqueInput').value.trim();
+  if(!input){ toast('วางสคริปต์หรือเนื้อหาคลิปก่อนนะครับ'); return; }
+  state.critiqueLoading = true; state.critiqueResult = null; render();
+
+  const system = `คุณเป็นบรรณาธิการคอนเทนต์ที่ช่วยวิจารณ์คลิปให้ครีเอเตอร์ท่องเที่ยว Babibird
+${state.styleBible}
+${state.hookFrameworks}
+${state.productionNotes}
+วิจารณ์เป็นภาษาไทย กระชับ ตรงไปตรงมา แบ่งเป็นหัวข้อ:
+1) จุดแข็ง
+2) จุดที่ควรปรับปรุง (ระบุจุดเสี่ยงที่คนดูจะเลื่อนผ่าน)
+3) คะแนน Hook คำพูด และ Visual Hook (1-10 แยกกัน) พร้อมเหตุผลสั้นๆ
+4) การตัดสลับมุมกล้อง/แตกช็อต ถี่พอที่จะรักษาความสนใจไหม
+5) CTA ที่ใช้อยู่ดีหรือไม่ ควรปรับเป็นอะไร
+6) ข้อเสนอแนะการเขียนใหม่แบบสั้นๆ 1-2 ตัวอย่าง`;
+
+  try{
+    const text = await callClaude(system, input, { maxTokens: 1500 });
+    state.critiqueResult = text;
+  }catch(e){
+    state.critiqueResult = 'เกิดข้อผิดพลาด: ' + e.message;
+  }
+  state.critiqueLoading = false;
+  render();
+}
+
+/* ============== EVENT HANDLERS ============== */
+function attachHandlers(){
+  document.querySelectorAll('.gate-btn').forEach(btn=>{
+    btn.onclick = ()=>{ state.tab = btn.dataset.tab; render(); };
+  });
+
+  // Calendar
+  const prevM = document.getElementById('prevMonth');
+  const nextM = document.getElementById('nextMonth');
+  if(prevM) prevM.onclick = ()=>{ state.calMonth--; if(state.calMonth<0){state.calMonth=11;state.calYear--;} render(); };
+  if(nextM) nextM.onclick = ()=>{ state.calMonth++; if(state.calMonth>11){state.calMonth=0;state.calYear++;} render(); };
+
+  document.querySelectorAll('.cal-day[data-date]').forEach(cell=>{
+    cell.addEventListener('click', (e)=>{
+      if(e.target.closest('.stub') || e.target.closest('.more-link')) return;
+      state.modal = { type:'edit', date: cell.dataset.date };
+      render();
+    });
+  });
+  document.querySelectorAll('.stub[data-item]').forEach(el=>{
+    el.onclick = (e)=>{ e.stopPropagation();
+      const item = state.items.find(it=>it.id===el.dataset.item);
+      state.modal = { type:'edit', item };
+      render();
+    };
+  });
+  document.querySelectorAll('.more-link[data-date]').forEach(el=>{
+    el.onclick = (e)=>{ e.stopPropagation();
+      state.modal = { type:'daylist', date: el.dataset.date };
+      render();
+    };
+  });
+
+  // Modal
+  const closeBtn = document.getElementById('closeModal');
+  if(closeBtn) closeBtn.onclick = ()=>{ state.modal=null; render(); };
+  const overlay = document.getElementById('overlay');
+  if(overlay) overlay.addEventListener('click', (e)=>{ if(e.target.id==='overlay'){ state.modal=null; render(); } });
+
+  const addNewForDay = document.getElementById('addNewForDay');
+  if(addNewForDay) addNewForDay.onclick = ()=>{ state.modal = { type:'edit', date: state.modal.date }; render(); };
+
+  document.querySelectorAll('[data-edit]').forEach(el=>{
+    el.onclick = ()=>{ const item = state.items.find(it=>it.id===el.dataset.edit); state.modal = { type:'edit', item }; render(); };
+  });
+
+  const saveBtn = document.getElementById('saveItem');
+  if(saveBtn) saveBtn.onclick = async ()=>{
+    const title = document.getElementById('f-title').value.trim();
+    if(!title){ toast('ใส่ชื่อคลิปก่อนนะครับ'); return; }
+    const existing = state.modal.item;
+    const newItem = {
+      id: existing ? existing.id : uid(),
+      date: document.getElementById('f-date').value,
+      platform: document.getElementById('f-platform').value,
+      title,
+      status: document.getElementById('f-status').value,
+      hook: document.getElementById('f-hook').value,
+      cta: document.getElementById('f-cta').value,
+      notes: document.getElementById('f-notes').value
+    };
+    if(existing){
+      state.items = state.items.map(it=>it.id===existing.id?newItem:it);
+    }else{
+      state.items.push(newItem);
+    }
+    await safeSet('content-items', state.items);
+    state.modal = null;
+    render();
+    toast('บันทึกแล้ว');
+  };
+  const delBtn = document.getElementById('deleteItem');
+  if(delBtn) delBtn.onclick = async ()=>{
+    state.items = state.items.filter(it=>it.id!==state.modal.item.id);
+    await safeSet('content-items', state.items);
+    state.modal = null;
+    render();
+    toast('ลบแล้ว');
+  };
+
+  // Style bible
+  const saveBible = document.getElementById('saveBible');
+  if(saveBible) saveBible.onclick = async ()=>{
+    state.styleBible = document.getElementById('styleBibleInput').value;
+    state.hookFrameworks = document.getElementById('hookFrameworksInput').value;
+    state.productionNotes = document.getElementById('productionNotesInput').value;
+    await safeSet('style-bible', state.styleBible);
+    await safeSet('hook-frameworks', state.hookFrameworks);
+    await safeSet('production-notes', state.productionNotes);
+    toast('บันทึก Style Bible แล้ว');
+  };
+
+  // Script generator
+  const genBtn = document.getElementById('generateScript');
+  if(genBtn) genBtn.onclick = generateScript;
+  const saveScriptToCal = document.getElementById('saveScriptToCal');
+  if(saveScriptToCal) saveScriptToCal.onclick = async ()=>{
+    const r = state.scriptResult;
+    const item = {
+      id: uid(), date: new Date().toISOString().slice(0,10), platform:'tiktok',
+      title: document.getElementById('scriptTopic') ? document.getElementById('scriptTopic').value.trim() || 'คอนเทนต์ใหม่' : 'คอนเทนต์ใหม่',
+      status:'writing', hook: r.hooks && r.hooks[0] ? r.hooks[0].text : '', cta: r.cta || '', notes: segmentsToText(r.segments)
+    };
+    state.items.push(item);
+    await safeSet('content-items', state.items);
+    toast('บันทึกลงปฏิทินแล้ว');
+  };
+
+  // Trend
+  const csvFile = document.getElementById('csvFile');
+  if(csvFile) csvFile.onchange = (e)=>{ if(e.target.files[0]) handleCsvUpload(e.target.files[0]); };
+  const runTrend = document.getElementById('runTrendAI');
+  if(runTrend) runTrend.onclick = runTrendAI;
+  if(state.analytics && state.analytics.hasDateSeries) setTimeout(drawTrendChart, 50);
+
+  // Critique
+  const runCrit = document.getElementById('runCritique');
+  if(runCrit) runCrit.onclick = runCritique;
+}
+
+loadState();
+</script>
+</body>
+</html>

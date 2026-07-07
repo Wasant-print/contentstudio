@@ -343,6 +343,23 @@
   }
   .seg-voice{font-size:14px;line-height:1.5;}
   .seg-visual{font-size:12px;color:#5c6b6d;margin-top:5px;font-style:italic;}
+
+  /* ===== thumbnails for uploaded images / extracted frames ===== */
+  .thumb-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+  .thumb{
+    position:relative;width:96px;height:72px;border-radius:8px;overflow:hidden;border:1px solid var(--ink);
+    background:var(--ink);
+  }
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+  .thumb-remove{
+    position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;
+    background:var(--stamp);color:white;border:none;font-size:12px;line-height:1;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;padding:0;
+  }
+  .thumb-time{
+    position:absolute;bottom:2px;left:2px;background:rgba(16,38,43,.75);color:var(--white);
+    font-family:'IBM Plex Mono',monospace;font-size:10px;padding:1px 5px;border-radius:4px;
+  }
   @media(max-width:640px){
     .gate-btn{min-width:44%;font-size:12px;}
     .header{flex-direction:column;align-items:flex-start;}
@@ -377,11 +394,18 @@ function toast(msg){
 
 /* ============== CLAUDE API HELPER ============== */
 async function callClaude(systemPrompt, userText, opts={}){
+  let content = userText;
+  if(opts.images && opts.images.length){
+    content = [
+      ...opts.images.map(img=>({ type:"image", source:{ type:"base64", media_type: img.mediaType, data: img.data } })),
+      { type:"text", text: userText }
+    ];
+  }
   const body = {
     model: "claude-sonnet-4-6",
     max_tokens: opts.maxTokens || 1000,
     system: systemPrompt,
-    messages: [{ role: "user", content: userText }]
+    messages: [{ role: "user", content }]
   };
   if(opts.webSearch){
     body.tools = [{ type: "web_search_20250305", name: "web_search" }];
@@ -398,6 +422,51 @@ async function callClaude(systemPrompt, userText, opts={}){
 function tryParseJSON(text){
   let clean = text.trim().replace(/^```json/i,'').replace(/^```/,'').replace(/```$/,'').trim();
   try{ return JSON.parse(clean); }catch(e){ return null; }
+}
+function parseDataUrl(dataUrl){
+  const m = dataUrl.match(/^data:(.+?);base64,(.*)$/);
+  if(!m) return null;
+  return { mediaType: m[1], data: m[2] };
+}
+function extractVideoFrames(file, frameCount=6){
+  return new Promise((resolve, reject)=>{
+    const video = document.createElement('video');
+    video.preload = 'auto';
+    video.muted = true;
+    video.style.display = 'none';
+    video.src = URL.createObjectURL(file);
+    document.body.appendChild(video);
+
+    const cleanup = ()=>{ URL.revokeObjectURL(video.src); video.remove(); };
+
+    video.onloadedmetadata = ()=>{
+      const duration = video.duration;
+      const canvas = document.createElement('canvas');
+      canvas.width = 360;
+      const times = [];
+      for(let i=0;i<frameCount;i++){ times.push((duration*(i+0.5))/frameCount); }
+      let idx = 0;
+      const frames = [];
+      function next(){
+        if(idx >= times.length){ cleanup(); resolve(frames); return; }
+        video.currentTime = times[idx];
+      }
+      video.onseeked = ()=>{
+        canvas.height = Math.round(canvas.width * (video.videoHeight/video.videoWidth || 0.5625));
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        frames.push({ time: times[idx], dataUrl: canvas.toDataURL('image/jpeg', 0.7) });
+        idx++;
+        next();
+      };
+      next();
+    };
+    video.onerror = ()=>{ cleanup(); reject(new Error('อ่านไฟล์วิดีโอไม่สำเร็จ')); };
+  });
+}
+function fmtTime(sec){
+  const m = Math.floor(sec/60), s = Math.round(sec%60);
+  return `${m}:${String(s).padStart(2,'0')}`;
 }
 
 /* ============== DEFAULTS ============== */
@@ -449,8 +518,12 @@ let state = {
   scriptLoading: false,
   trendResult: null,
   trendLoading: false,
+  trendImages: [], // array of dataURLs from uploaded analytics screenshots
   critiqueResult: null,
-  critiqueLoading: false
+  critiqueLoading: false,
+  critiqueFrames: [], // array of {time, dataUrl} extracted from uploaded clip
+  critiqueVideoName: null,
+  critiqueExtracting: false
 };
 
 async function loadState(){
@@ -745,6 +818,21 @@ function renderTrendTab(){
       <input type="file" id="csvFile" accept=".csv">
     </div>
 
+    <div class="field">
+      <label>หรืออัปโหลดรูป Screenshot หน้า Analytics (อัปได้หลายรูป)</label>
+      <input type="file" id="trendImgFile" accept="image/*" multiple>
+    </div>
+    ${state.trendImages.length ? `
+      <div class="thumb-row">
+        ${state.trendImages.map((src,i)=>`
+          <div class="thumb">
+            <img src="${src}">
+            <button class="thumb-remove" data-remove-trend-img="${i}">×</button>
+          </div>
+        `).join('')}
+      </div>
+    ` : ''}
+
     ${state.analytics ? renderAnalyticsSummary() : ''}
 
     <button class="primary" id="runTrendAI" ${state.trendLoading?'disabled':''} style="margin-top:10px">
@@ -847,14 +935,19 @@ async function runTrendAI(){
   state.trendLoading = true; state.trendResult = null; render();
   const a = state.analytics;
   const summary = a ? `สรุปข้อมูลช่อง: จำนวนคลิป ${a.rowCount}, ยอดวิวรวม ${a.totalViews}, วิวเฉลี่ย ${a.avgViews}, engagement rate ${a.engagementRate}%. คลิปที่วิวสูงสุด: ${a.topRows.map(r=>r.title+' ('+r.views+' วิว)').join(', ')}.`
-    : 'ยังไม่มีข้อมูลสถิติช่องอัปโหลด ให้วิเคราะห์จากเทรนด์ตลาดโดยรวมของคอนเทนต์ท่องเที่ยวแนวรีวิวตรงไปตรงมาบน TikTok/YouTube';
+    : 'ยังไม่มีข้อมูลสถิติช่องอัปโหลดเป็น CSV';
+
+  const hasImages = state.trendImages.length > 0;
+  const imageNote = hasImages ? `\nมีการแนบรูป screenshot หน้า analytics มาด้วย ${state.trendImages.length} รูป ให้อ่านตัวเลขจากรูปประกอบการวิเคราะห์ด้วย` : '';
 
   const system = `คุณเป็นนักวิเคราะห์เทรนด์คอนเทนต์ท่องเที่ยวสำหรับครีเอเตอร์ไทยชื่อ Babibird (คอนเทนต์แนวรีวิวตรงไปตรงมา ลง TikTok และ YouTube)
 ${state.styleBible}
-ให้วิเคราะห์เป็นภาษาไทย กระชับ แบ่งเป็นหัวข้อ: 1) ภาพรวมผลงานช่องตอนนี้ 2) เทรนด์คอนเทนต์ท่องเที่ยวที่กำลังมาแรงตอนนี้ 3) แนวโน้มที่น่าจะมาในอนาคตอันใกล้ 4) คำแนะนำหัวข้อคลิปที่ควรทำต่อไป 3 อย่าง`;
+ให้วิเคราะห์เป็นภาษาไทย กระชับ แบ่งเป็นหัวข้อ: 1) ภาพรวมผลงานช่องตอนนี้ (อ้างอิงตัวเลขจากข้อมูล/รูปที่ให้มา) 2) เทรนด์คอนเทนต์ท่องเที่ยวที่กำลังมาแรงตอนนี้ 3) แนวโน้มที่น่าจะมาในอนาคตอันใกล้ 4) คำแนะนำหัวข้อคลิปที่ควรทำต่อไป 3 อย่าง`;
+
+  const images = state.trendImages.map(src=>parseDataUrl(src)).filter(Boolean);
 
   try{
-    const text = await callClaude(system, summary, { webSearch:true, maxTokens: 1500 });
+    const text = await callClaude(system, summary + imageNote, { webSearch:true, maxTokens: 1500, images });
     state.trendResult = text;
   }catch(e){
     state.trendResult = 'เกิดข้อผิดพลาด: ' + e.message;
@@ -867,9 +960,27 @@ ${state.styleBible}
 function renderCritiqueTab(){
   return `<div class="panel">
     <h2>🧐 วิจารณ์คลิป</h2>
-    <div class="sub">วางสคริปต์ หรือคำบรรยายคลิปที่ทำเสร็จแล้ว ให้ AI วิจารณ์ตาม hook/CTA framework ของช่อง</div>
-    <div class="field"><label>สคริปต์ / เนื้อหาคลิป</label>
-      <textarea id="critiqueInput" rows="10" placeholder="วางสคริปต์เต็ม หรือสรุปเนื้อหาคลิปที่นี่..."></textarea>
+    <div class="sub">อัปโหลดไฟล์วิดีโอที่ทำเสร็จแล้วได้เลย ระบบจะแกะเฟรมจากคลิปมาให้ AI ดูภาพจริงประกอบการวิจารณ์ หรือจะวางสคริปต์ข้อความอย่างเดียวก็ได้</div>
+
+    <div class="field">
+      <label>อัปโหลดไฟล์วิดีโอ (แกะเฟรมอัตโนมัติ)</label>
+      <input type="file" id="clipVideoFile" accept="video/*">
+    </div>
+    ${state.critiqueExtracting ? `<div class="loading" style="margin:8px 0"><span class="spinner"></span>กำลังแกะเฟรมจากวิดีโอ...</div>` : ''}
+    ${state.critiqueFrames.length ? `
+      <div class="thumb-row">
+        ${state.critiqueFrames.map(f=>`
+          <div class="thumb">
+            <img src="${f.dataUrl}">
+            <span class="thumb-time">${fmtTime(f.time)}</span>
+          </div>
+        `).join('')}
+      </div>
+      <div class="sub" style="margin-top:6px">แกะมาแล้ว ${state.critiqueFrames.length} เฟรมจาก "${escapeHtml(state.critiqueVideoName||'')}"</div>
+    ` : ''}
+
+    <div class="field" style="margin-top:12px"><label>สคริปต์ / บทพูด (แนบเพิ่มได้ ไม่บังคับถ้ามีวิดีโอแล้ว)</label>
+      <textarea id="critiqueInput" rows="8" placeholder="วางสคริปต์เต็ม หรือสรุปเนื้อหาคลิปที่นี่..."></textarea>
     </div>
     <button class="primary" id="runCritique" ${state.critiqueLoading?'disabled':''}>
       ${state.critiqueLoading ? 'กำลังวิจารณ์...' : '🧠 วิจารณ์คลิปนี้'}
@@ -881,7 +992,8 @@ function renderCritiqueTab(){
 
 async function runCritique(){
   const input = document.getElementById('critiqueInput').value.trim();
-  if(!input){ toast('วางสคริปต์หรือเนื้อหาคลิปก่อนนะครับ'); return; }
+  const hasFrames = state.critiqueFrames.length > 0;
+  if(!input && !hasFrames){ toast('อัปโหลดวิดีโอ หรือวางสคริปต์ก่อนนะครับ'); return; }
   state.critiqueLoading = true; state.critiqueResult = null; render();
 
   const system = `คุณเป็นบรรณาธิการคอนเทนต์ที่ช่วยวิจารณ์คลิปให้ครีเอเตอร์ท่องเที่ยว Babibird
@@ -896,8 +1008,12 @@ ${state.productionNotes}
 5) CTA ที่ใช้อยู่ดีหรือไม่ ควรปรับเป็นอะไร
 6) ข้อเสนอแนะการเขียนใหม่แบบสั้นๆ 1-2 ตัวอย่าง`;
 
+  const frameNote = hasFrames ? `แนบภาพเฟรมจากคลิปมาให้ดู ${state.critiqueFrames.length} เฟรม เรียงตามลำดับเวลาในคลิป (${state.critiqueFrames.map(f=>fmtTime(f.time)).join(', ')}) ให้วิจารณ์ภาพ/มุมกล้อง/การจัดองค์ประกอบจากเฟรมเหล่านี้ประกอบด้วย\n` : '';
+  const userText = frameNote + (input ? `สคริปต์/บทพูด:\n${input}` : 'ไม่มีสคริปต์แนบ ให้วิจารณ์จากภาพเฟรมเป็นหลัก');
+  const images = hasFrames ? state.critiqueFrames.map(f=>parseDataUrl(f.dataUrl)).filter(Boolean) : [];
+
   try{
-    const text = await callClaude(system, input, { maxTokens: 1500 });
+    const text = await callClaude(system, userText, { maxTokens: 1500, images });
     state.critiqueResult = text;
   }catch(e){
     state.critiqueResult = 'เกิดข้อผิดพลาด: ' + e.message;
@@ -1017,11 +1133,39 @@ function attachHandlers(){
   // Trend
   const csvFile = document.getElementById('csvFile');
   if(csvFile) csvFile.onchange = (e)=>{ if(e.target.files[0]) handleCsvUpload(e.target.files[0]); };
+  const trendImgFile = document.getElementById('trendImgFile');
+  if(trendImgFile) trendImgFile.onchange = (e)=>{
+    const files = Array.from(e.target.files||[]);
+    let pending = files.length;
+    if(!pending) return;
+    files.forEach(file=>{
+      const reader = new FileReader();
+      reader.onload = ()=>{ state.trendImages.push(reader.result); render(); };
+      reader.readAsDataURL(file);
+    });
+  };
+  document.querySelectorAll('[data-remove-trend-img]').forEach(btn=>{
+    btn.onclick = ()=>{ state.trendImages.splice(parseInt(btn.dataset.removeTrendImg,10),1); render(); };
+  });
   const runTrend = document.getElementById('runTrendAI');
   if(runTrend) runTrend.onclick = runTrendAI;
   if(state.analytics && state.analytics.hasDateSeries) setTimeout(drawTrendChart, 50);
 
   // Critique
+  const clipVideoFile = document.getElementById('clipVideoFile');
+  if(clipVideoFile) clipVideoFile.onchange = async (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    state.critiqueExtracting = true; state.critiqueFrames = []; state.critiqueVideoName = file.name; render();
+    try{
+      const frames = await extractVideoFrames(file, 6);
+      state.critiqueFrames = frames;
+    }catch(err){
+      toast('แกะเฟรมจากวิดีโอไม่สำเร็จ: ' + err.message);
+    }
+    state.critiqueExtracting = false;
+    render();
+  };
   const runCrit = document.getElementById('runCritique');
   if(runCrit) runCrit.onclick = runCritique;
 }

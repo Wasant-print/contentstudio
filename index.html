@@ -476,7 +476,14 @@ const DEFAULT_STYLE_BIBLE = `สไตล์การเขียนของช
 - ใช้สรรพนามบุรุษที่ 1 "ผม" ตลอดสคริปต์
 - โทนเหมือนเล่าเรื่องให้เพื่อนฟัง เป็นกันเอง จริงใจ ไม่ยัดเยียดขาย
 - คอนเทนต์แนว "รีวิวตรงไปตรงมา" ช่วยคนลังเลตัดสินใจก่อนไปเที่ยว
-- ชอบใช้มุม Contrarian Hook ตั้งคำถามท้าทายความเชื่อทั่วไป`;
+- ชอบใช้มุม Contrarian Hook ตั้งคำถามท้าทายความเชื่อทั่วไป
+
+ลักษณะการพูดจริงจากคลิปต้นฉบับ (ใช้เป็นน้ำเสียงอ้างอิง):
+- เปิดคลิปด้วยประโยคทิ้งปมกวนๆ ก่อนเข้าเรื่อง เช่น ตั้งคำถามแล้วบอกว่า "เดี๋ยวเล่าให้ฟัง" ก่อนค่อยอธิบายจริง
+- ใช้คำลงท้าย "นะครับ" แทรกกลางประโยคบ่อยๆ ให้ฟังเป็นกันเองเหมือนคุยสด ไม่ได้อ่านสคริปต์
+- ช่วงกลางอธิบายเป็นขั้นเป็นตอน ลงรายละเอียดที่จับต้องได้ (สเปก ตัวเลข ขั้นตอน) แทรกมุกหรือคำอุทานเล็กๆ ระหว่างพูด
+- บางคลิปมีลักษณะเป็นบทสนทนาสั้นๆ กับคนอื่น (ถาม-ตอบ) แทรกระหว่างเล่าเรื่อง ทำให้ดูเป็นธรรมชาติ ไม่ใช่พูดคนเดียวตลอด
+- ปิดท้ายด้วยการทิ้งปมต่อยอดไปเรื่องถัดไป หรือจบด้วยมุกกวนๆ/ปัญหาที่ยังไม่จบ มากกว่าจะสรุปเป็นทางการ`;
 
 const DEFAULT_HOOK_FRAMEWORKS = `Hook Frameworks ที่ใช้ประจำ:
 1. Contrarian Hook — ท้าทายความเชื่อทั่วไป เช่น "ทุกคนบอกว่าอย่าไปหน้าฝน แต่..."
@@ -545,7 +552,7 @@ function render(){
         <span class="tag">Boarding Pass · Content Ops</span>
         <h1>BABIBIRD STUDIO</h1>
       </div>
-      <div class="route">CHIANG MAI → EVERYWHERE<br>TIKTOK · YOUTUBE</div>
+      <div class="route">CHIANG MAI → EVERYWHERE<br>TIKTOK ONLY</div>
     </div>
     <div class="gates">
       ${gateBtn('calendar','GATE 1','ปฏิทินคอนเทนต์')}
@@ -652,8 +659,7 @@ function renderModal(){
         <div class="field"><label>วันที่</label><input type="date" id="f-date" value="${item.date}"></div>
         <div class="field"><label>แพลตฟอร์ม</label>
           <select id="f-platform">
-            <option value="tiktok" ${item.platform==='tiktok'?'selected':''}>TikTok</option>
-            <option value="youtube" ${item.platform==='youtube'?'selected':''}>YouTube</option>
+            <option value="tiktok" selected>TikTok</option>
           </select>
         </div>
       </div>
@@ -696,20 +702,21 @@ function renderScriptTab(){
 
     <div class="row" style="margin-top:14px">
       <div class="field"><label>หัวข้อ / สถานที่ / มุมมอง</label><input type="text" id="scriptTopic" placeholder="เช่น เที่ยว Nusa Penida หน้าฝน คุ้มมั้ย"></div>
-      <div class="field"><label>แพลตฟอร์ม</label>
-        <select id="scriptPlatform">
-          <option value="tiktok">TikTok (60 วิ)</option>
-          <option value="youtube">YouTube (ยาว)</option>
+      <div class="field"><label>ความยาวคลิป</label>
+        <select id="scriptDuration">
+          <option value="30">30 วินาที</option>
+          <option value="45">45 วินาที</option>
+          <option value="60" selected>60 วินาที</option>
         </select>
       </div>
-    </div>
-    <div class="field"><label>เป้าหมาย CTA</label>
-      <select id="scriptGoal">
-        <option value="follow">อยากให้ Follow</option>
-        <option value="comment">อยากให้ Comment</option>
-        <option value="save">อยากให้ Save</option>
-        <option value="watch">อยากให้ดูจนจบ</option>
-      </select>
+      <div class="field"><label>เป้าหมาย CTA</label>
+        <select id="scriptGoal">
+          <option value="follow">อยากให้ Follow</option>
+          <option value="comment">อยากให้ Comment</option>
+          <option value="save">อยากให้ Save</option>
+          <option value="watch">อยากให้ดูจนจบ</option>
+        </select>
+      </div>
     </div>
     <button class="primary" id="generateScript" ${state.scriptLoading?'disabled':''}>
       ${state.scriptLoading ? 'กำลังคิด...' : '✨ สร้าง Hook + Script'}
@@ -765,35 +772,40 @@ function segmentsToText(segments){
 async function generateScript(){
   const topic = document.getElementById('scriptTopic').value.trim();
   if(!topic){ toast('ใส่หัวข้อก่อนนะครับ'); return; }
-  const platform = document.getElementById('scriptPlatform').value;
+  const duration = parseInt(document.getElementById('scriptDuration').value, 10);
   const goal = document.getElementById('scriptGoal').value;
   const goalLabel = {follow:'ให้ Follow',comment:'ให้ Comment',save:'ให้ Save',watch:'ให้ดูจนจบ'}[goal];
 
   state.scriptLoading = true; state.scriptResult = null; render();
 
-  const system = `คุณเป็นผู้ช่วยเขียนสคริปต์คอนเทนต์ท่องเที่ยวให้ครีเอเตอร์ชื่อ Babibird
+  const ctaStart = Math.max(duration - Math.round(duration*0.15), duration-8);
+
+  const system = `คุณเป็นผู้ช่วยเขียนสคริปต์คอนเทนต์ท่องเที่ยวสำหรับ TikTok ให้ครีเอเตอร์ชื่อ Babibird
 ${state.styleBible}
 
 ${state.hookFrameworks}
 
 ${state.productionNotes}
 
-กำหนดความยาวรวมของคลิป: ${platform === 'tiktok' ? '60 วินาที' : '6-8 นาที'}
+กำหนดความยาวรวมของคลิป: ${duration} วินาทีพอดี (TikTok เท่านั้น)
 
-ให้แบ่งสคริปต์ออกเป็นช่วงเวลาที่ชัดเจน (segments) ครอบคลุมตั้งแต่ต้นจนจบคลิปโดยไม่มีช่วงเวลาขาดหาย แต่ละช่วงต้องระบุ:
+ให้แบ่งสคริปต์ออกเป็นช่วงเวลาที่ชัดเจน (segments) ครอบคลุมตั้งแต่ 0:00 ถึง 0:${String(duration).padStart(2,'0')} โดยไม่มีช่วงเวลาขาดหายหรือเกินความยาวที่กำหนด อย่างน้อย 4 ช่วง ตามสัดส่วนนี้:
+- ช่วงต้น (Hook): วินาทีที่ 0 ถึงประมาณวินาทีที่ 3
+- ช่วงต้น (Setup): ต่อจาก Hook ถึงประมาณ 20-25% ของความยาวคลิป
+- ช่วงกลาง (Payoff): ตั้งแต่ท้าย Setup จนถึงประมาณวินาทีที่ ${ctaStart}
+- ช่วงท้าย (CTA): ตั้งแต่วินาทีที่ ${ctaStart} ถึงจบคลิปที่วินาทีที่ ${duration}
+
+แต่ละช่วงต้องระบุ:
 - time: ช่วงเวลาแบบ "0:00-0:03" (นาที:วินาที)
 - part: ระบุว่าเป็น "ช่วงต้น (Hook)", "ช่วงต้น (Setup)", "ช่วงกลาง (Payoff)", หรือ "ช่วงท้าย (CTA)"
 - voiceover: บทพูดของผมในช่วงนั้น (ภาษาพูด กระชับ)
 - visual: คำแนะนำภาพ/มุมกล้อง/การแตกช็อตในช่วงนั้น
 
-สำหรับ TikTok ให้มีอย่างน้อย 4 ช่วง ตาม pacing 0-3s / 3-15s / 15-45s / 45-60s
-สำหรับ YouTube ให้แบ่งเป็นช่วงย่อยทุกประมาณ 30-60 วินาที จนครบความยาว
-
 ตอบกลับเป็น JSON เท่านั้น ห้ามมีข้อความอื่นหรือ markdown code fence นอกเหนือจาก JSON โครงสร้างนี้:
 {"hooks":[{"type":"ชื่อ framework","text":"ตัวอย่างประโยค hook"}, ... อย่างน้อย 3 แบบ],"segments":[{"time":"0:00-0:03","part":"ช่วงต้น (Hook)","voiceover":"...","visual":"..."}, ...ครบทุกช่วงจนจบคลิป],"cta":"คำแนะนำ CTA พร้อมตัวอย่างประโยค"}`;
 
   const userMsg = `หัวข้อ: ${topic}
-แพลตฟอร์ม: ${platform === 'tiktok' ? 'TikTok ความยาว 60 วินาที' : 'YouTube แบบยาว'}
+แพลตฟอร์ม: TikTok ความยาว ${duration} วินาที
 เป้าหมาย CTA: ${goalLabel}`;
 
   try{
@@ -811,7 +823,7 @@ ${state.productionNotes}
 function renderTrendTab(){
   return `<div class="panel">
     <h2>📈 วิเคราะห์เทรนด์</h2>
-    <div class="sub">อัปโหลดไฟล์ export จาก TikTok/YouTube analytics (.csv) เพื่อดูภาพรวม แล้วให้ AI ช่วยวิเคราะห์เทรนด์ปัจจุบัน+อนาคต</div>
+    <div class="sub">อัปโหลดไฟล์ export จาก TikTok analytics (.csv) เพื่อดูภาพรวม แล้วให้ AI ช่วยวิเคราะห์เทรนด์ปัจจุบัน+อนาคต</div>
 
     <div class="field">
       <label>อัปโหลดไฟล์ CSV</label>
@@ -940,7 +952,7 @@ async function runTrendAI(){
   const hasImages = state.trendImages.length > 0;
   const imageNote = hasImages ? `\nมีการแนบรูป screenshot หน้า analytics มาด้วย ${state.trendImages.length} รูป ให้อ่านตัวเลขจากรูปประกอบการวิเคราะห์ด้วย` : '';
 
-  const system = `คุณเป็นนักวิเคราะห์เทรนด์คอนเทนต์ท่องเที่ยวสำหรับครีเอเตอร์ไทยชื่อ Babibird (คอนเทนต์แนวรีวิวตรงไปตรงมา ลง TikTok และ YouTube)
+  const system = `คุณเป็นนักวิเคราะห์เทรนด์คอนเทนต์ท่องเที่ยวสำหรับครีเอเตอร์ไทยชื่อ Babibird (คอนเทนต์แนวรีวิวตรงไปตรงมา ลง TikTok)
 ${state.styleBible}
 ให้วิเคราะห์เป็นภาษาไทย กระชับ แบ่งเป็นหัวข้อ: 1) ภาพรวมผลงานช่องตอนนี้ (อ้างอิงตัวเลขจากข้อมูล/รูปที่ให้มา) 2) เทรนด์คอนเทนต์ท่องเที่ยวที่กำลังมาแรงตอนนี้ 3) แนวโน้มที่น่าจะมาในอนาคตอันใกล้ 4) คำแนะนำหัวข้อคลิปที่ควรทำต่อไป 3 อย่าง`;
 

@@ -372,15 +372,15 @@
 <div class="toast" id="toast"></div>
 
 <script>
-/* ============== STORAGE HELPERS ============== */
+/* ============== STORAGE HELPERS (browser localStorage — works on self-hosted GitHub Pages) ============== */
 async function safeGet(key, fallback){
   try{
-    const r = await window.storage.get(key);
-    return r ? JSON.parse(r.value) : fallback;
+    const raw = localStorage.getItem(key);
+    return raw !== null ? JSON.parse(raw) : fallback;
   }catch(e){ return fallback; }
 }
 async function safeSet(key, value){
-  try{ await window.storage.set(key, JSON.stringify(value)); return true; }
+  try{ localStorage.setItem(key, JSON.stringify(value)); return true; }
   catch(e){ console.error('storage set failed', e); return false; }
 }
 
@@ -392,30 +392,38 @@ function toast(msg){
   setTimeout(()=>t.classList.remove('show'), 2200);
 }
 
-/* ============== CLAUDE API HELPER ============== */
+/* ============== GEMINI (GOOGLE AI STUDIO) API HELPER ============== */
 async function callClaude(systemPrompt, userText, opts={}){
-  let content = userText;
-  if(opts.images && opts.images.length){
-    content = [
-      ...opts.images.map(img=>({ type:"image", source:{ type:"base64", media_type: img.mediaType, data: img.data } })),
-      { type:"text", text: userText }
-    ];
+  const apiKey = state.googleApiKey;
+  if(!apiKey){
+    throw new Error('ยังไม่ได้ใส่ Google API Key — ใส่ในช่อง "ตั้งค่า Google API Key" ด้านบนก่อนนะครับ');
   }
+
+  const parts = [];
+  if(opts.images && opts.images.length){
+    opts.images.forEach(img=>{
+      parts.push({ inline_data: { mime_type: img.mediaType, data: img.data } });
+    });
+  }
+  parts.push({ text: userText });
+
   const body = {
-    model: "claude-sonnet-4-6",
-    max_tokens: opts.maxTokens || 1000,
-    system: systemPrompt,
-    messages: [{ role: "user", content }]
+    system_instruction: { parts: [{ text: systemPrompt }] },
+    contents: [{ role: "user", parts }],
+    generationConfig: { maxOutputTokens: opts.maxTokens || 1000 }
   };
   if(opts.webSearch){
-    body.tools = [{ type: "web_search_20250305", name: "web_search" }];
+    body.tools = [{ google_search: {} }];
   }
+
+  const model = "gemini-2.5-flash";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
   const maxAttempts = 3;
   let lastErr = null;
   for(let attempt=1; attempt<=maxAttempts; attempt++){
     try{
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body)
@@ -428,7 +436,10 @@ async function callClaude(systemPrompt, userText, opts={}){
       if(data.error){
         throw new Error(data.error.message || 'API คืนค่า error');
       }
-      const text = (data.content || []).filter(b=>b.type==="text").map(b=>b.text).join("\n\n");
+      const cand = data.candidates && data.candidates[0];
+      const text = cand && cand.content && cand.content.parts
+        ? cand.content.parts.map(p=>p.text||'').join('\n\n')
+        : '';
       return text || "(ไม่ได้รับคำตอบ ลองใหม่อีกครั้ง)";
     }catch(err){
       lastErr = err;
@@ -543,6 +554,7 @@ let state = {
   styleBible: DEFAULT_STYLE_BIBLE,
   hookFrameworks: DEFAULT_HOOK_FRAMEWORKS,
   productionNotes: DEFAULT_PRODUCTION_NOTES,
+  googleApiKey: '',
   calMonth: new Date().getMonth(),
   calYear: new Date().getFullYear(),
   modal: null, // {type:'day', date} | {type:'edit', item}
@@ -564,6 +576,7 @@ async function loadState(){
   state.styleBible = await safeGet('style-bible', DEFAULT_STYLE_BIBLE);
   state.hookFrameworks = await safeGet('hook-frameworks', DEFAULT_HOOK_FRAMEWORKS);
   state.productionNotes = await safeGet('production-notes', DEFAULT_PRODUCTION_NOTES);
+  state.googleApiKey = await safeGet('google-api-key', '');
   render();
 }
 
@@ -586,6 +599,14 @@ function render(){
       ${gateBtn('trend','GATE 3','วิเคราะห์เทรนด์')}
       ${gateBtn('critique','GATE 4','วิจารณ์คลิป')}
     </div>
+    <details class="bible" style="margin-top:12px">
+      <summary>🔑 ตั้งค่า Google API Key ${state.googleApiKey ? '(ใส่แล้ว ✓)' : '(ยังไม่ได้ใส่)'}</summary>
+      <div class="panel" style="margin-top:8px">
+        <div class="sub">ฟีเจอร์ AI ทั้งหมดในแอปนี้ใช้ Google AI Studio (Gemini) ฟรี — ขอ API key ได้ที่ <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">aistudio.google.com/app/apikey</a> แล้ววางที่นี่ (เก็บไว้ในเบราว์เซอร์เครื่องพี่เท่านั้น ไม่ถูกส่งขึ้น GitHub)</div>
+        <div class="field"><label>Google API Key</label><input type="text" id="googleApiKeyInput" value="${escapeHtml(state.googleApiKey)}" placeholder="วาง API Key ที่นี่"></div>
+        <button class="ghost" id="saveApiKey">บันทึก API Key</button>
+      </div>
+    </details>
     <div id="panel">${renderPanel()}</div>
     ${state.modal ? renderModal() : ''}
   `;
@@ -1062,6 +1083,15 @@ ${state.productionNotes}
 
 /* ============== EVENT HANDLERS ============== */
 function attachHandlers(){
+  const saveApiKeyBtn = document.getElementById('saveApiKey');
+  if(saveApiKeyBtn) saveApiKeyBtn.onclick = async ()=>{
+    const val = document.getElementById('googleApiKeyInput').value.trim();
+    state.googleApiKey = val;
+    await safeSet('google-api-key', val);
+    toast(val ? 'บันทึก API Key แล้ว' : 'ลบ API Key แล้ว');
+    render();
+  };
+
   document.querySelectorAll('.gate-btn').forEach(btn=>{
     btn.onclick = ()=>{ state.tab = btn.dataset.tab; render(); };
   });
